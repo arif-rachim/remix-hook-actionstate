@@ -1,0 +1,36 @@
+{
+  "name": "remix-hook-actionstate",
+  "version": "1.0.0-alpha.36",
+  "private": false,
+  "author": {
+    "email": "a.arif.r@gmail.com",
+    "name": "Arif Rachim"
+  },
+  "license": "MIT",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "types": "./lib/esm/index.d.ts",
+  "scripts": {
+    "build": "npm run build:cjs && npm run build:esm",
+    "build:cjs": "tsc -p . --module commonjs --outDir lib/cjs",
+    "build:esm": "tsc -p . --module esnext --outDir lib/esm",
+    "start": "npm run build -- -w",
+    "test": "jest --coverage"
+  },
+  "peerDependencies": {
+    "react": ">=16.14.0",
+    "react-dom": ">=16.14.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.14.7",
+    "@babel/preset-react": "^7.14.5",
+    "@remix-run/react": "^1.6.1",
+    "@types/react": "^16.14.11",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
+    "typescript": "^4.3.5"
+  },
+  "dependencies": {
+    "react-hook-useobserver": "^1.0.0-alpha.18"
+  }
+}
