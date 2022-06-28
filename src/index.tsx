@@ -1,6 +1,6 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {createContext, useEffect, useMemo, useRef, useState} from "react";
 import {ObserverValue, useObserver} from "react-hook-useobserver";
-import {useActionData, useLoaderData} from "@remix-run/react";
+import {Form as RemixForm, FormProps, useActionData} from "@remix-run/react";
 
 /**
  * we can use actionStateFunction in remix actionFunction to obtain the action state.
@@ -51,32 +51,38 @@ export type ActionStateValueFC<T> = React.FC<{ selector: (param?: T) => any, ren
  */
 export type UseActionStateValue<T> = (selector: (param?: T) => any) => void;
 
+const ActionStateContext = createContext<[any, React.Dispatch<React.SetStateAction<any>>, {
+    useActionStateListener: UseActionStateListener<any>,
+    useActionStateValue: UseActionStateValue<any>,
+    ActionStateValue: ActionStateValueFC<any>
+}] | undefined>(undefined);
+
 /**
-* <pre>
+ * <pre>
  A hook known as useRemixActionState can be utilized to facilitate the sharing of state between the client component and the server action function. The following is an explanation of how to use the useRemixActionState function:
  1. we make a call to the useRemixActionState hook inside the component.
  2. using useRemixActionState will result in the return of an array that has the following elements:
-        array index to 0: the value of the state
-        array index to 1: is a setState function, just how we use useState when we work with react.
-        array index to 2: refers to an object that has the following values :
+ array index to 0: the value of the state
+ array index to 1: is a setState function, just how we use useState when we work with react.
+ array index to 2: refers to an object that has the following values :
 
  1. ActionStateField : This is the React Component that needs to be mounted in the Form. This ActionStateField Component will render the html input element with the type hidden.
  2. ActionStateValue : This is the React Component, which can be used to render the state value based on the selector function. Means that it requires both a function for selecting state properties and a function for rendering the value. If the value that is picked by the selector changes, then the ActionStateValue component will be rendered. This is helpful for decreasing the amount of renderings that are done more frequently than necessary.
  3. useActionStateValue : This is a React Hook that has a selector function. The difference between this hook and the ActionStateValue component is that this hook returns the value of the state in a direct manner. There are situations when this can result in inefficient re-rendering of the component that uses it.
  4. useActionStateListener : This is a React Hook that consists of two functions: a selector function and a listener function. This is helpful if all you want to do is listen for changes in the action state, but you don't want to have to re-render the react component.
-* </pre>
+ * </pre>
  */
-export function useRemixActionState<T>(): [T | undefined, React.Dispatch<React.SetStateAction<T>>, {
+export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefined, React.Dispatch<React.SetStateAction<T>>, {
     ActionStateField: React.FC,
     useActionStateListener: UseActionStateListener<T | undefined>,
     useActionStateValue: UseActionStateValue<T>,
-    ActionStateValue: ActionStateValueFC<T>
+    ActionStateValue: ActionStateValueFC<T>,
+    Form: React.FC<FormProps & React.RefAttributes<HTMLFormElement>>
 }] {
 
-    const loaderData = useLoaderData<T>();
     const actionData = useActionData<T>();
     const isLoadedRef = useRef(false);
-    const [$state, setState] = useObserver<T | undefined>(loaderData);
+    const [$state, setState] = useObserver<T|undefined>(initValue);
     useEffect(() => {
         if (!isLoadedRef.current) {
             isLoadedRef.current = true;
@@ -113,7 +119,6 @@ export function useRemixActionState<T>(): [T | undefined, React.Dispatch<React.S
             }, []);
         }
 
-
         function useActionStateValue<T>(selector: (param: T | undefined) => any) {
             const [value, setValue] = useState(() => selector($state.current as any));
             useActionStateListener(selector, setValue);
@@ -125,14 +130,25 @@ export function useRemixActionState<T>(): [T | undefined, React.Dispatch<React.S
             return props.render(value);
         }
 
-        return {useActionStateListener, useActionStateValue, ActionStateValue}
+        function Form(props: FormProps & React.RefAttributes<HTMLFormElement>) {
+            return <RemixForm {...props}>
+                <ActionStateContext.Provider
+                    value={[state, setState, {useActionStateListener, useActionStateValue, ActionStateValue}]}>
+                    <ActionStateField/>
+                    {props.children}
+                </ActionStateContext.Provider>
+            </RemixForm>
+        }
+
+        return {useActionStateListener, useActionStateValue, ActionStateValue, Form}
     }, [$state]);
 
-    const {ActionStateValue, useActionStateValue, useActionStateListener} = hooks;
+    const {ActionStateValue, useActionStateValue, useActionStateListener, Form} = hooks;
     return [state, setState as React.Dispatch<React.SetStateAction<T>>, {
         ActionStateField,
         useActionStateListener,
         useActionStateValue,
-        ActionStateValue
+        ActionStateValue,
+        Form
     }];
 }
