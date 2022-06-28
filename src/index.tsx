@@ -1,4 +1,4 @@
-import React, {createContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {createContext, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {ObserverValue, useObserver} from "react-hook-useobserver";
 import {Form as RemixForm, FormProps, useActionData} from "@remix-run/react";
 
@@ -51,11 +51,21 @@ export type ActionStateValueFC<T> = React.FC<{ selector: (param?: T) => any, ren
  */
 export type UseActionStateValue<T> = (selector: (param?: T) => any) => void;
 
-const ActionStateContext = createContext<[any, React.Dispatch<React.SetStateAction<any>>, {
+/**
+ * FormContext to get the value of the action state
+ */
+const FormContext = createContext<[any, React.Dispatch<React.SetStateAction<any>>, {
     useActionStateListener: UseActionStateListener<any>,
     useActionStateValue: UseActionStateValue<any>,
     ActionStateValue: ActionStateValueFC<any>
 }] | undefined>(undefined);
+
+/**
+ * Hooks to get the formState by using the remix action state
+ */
+export function useFormState(){
+    return useContext(FormContext);
+}
 
 /**
  * <pre>
@@ -132,11 +142,11 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
         function Form(props: FormProps & React.RefAttributes<HTMLFormElement>) {
             return <RemixForm {...props}>
-                <ActionStateContext.Provider
+                <FormContext.Provider
                     value={[state, setState, {useActionStateListener, useActionStateValue, ActionStateValue}]}>
                     <ActionStateField/>
                     {props.children}
-                </ActionStateContext.Provider>
+                </FormContext.Provider>
             </RemixForm>
         }
 
