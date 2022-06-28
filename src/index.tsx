@@ -54,17 +54,18 @@ export type UseActionStateValue<T> = (selector: (param?: T) => any) => void;
 /**
  * FormContext to get the value of the action state
  */
-const FormContext = createContext<[any, React.Dispatch<React.SetStateAction<any>>, {
-    useActionStateListener: UseActionStateListener<any>,
-    useActionStateValue: UseActionStateValue<any>,
-    ActionStateValue: ActionStateValueFC<any>
-}] | undefined>(undefined);
+const FormContext = createContext<any>([]);
 
 /**
  * Hooks to get the formState by using the remix action state
  */
-export function useFormState(){
-    return useContext(FormContext);
+export function useFormState(): [any, React.Dispatch<React.SetStateAction<any>>, {
+    useActionStateListener: UseActionStateListener<any>,
+    useActionStateValue: UseActionStateValue<any>,
+    ActionStateValue: ActionStateValueFC<any>
+}] {
+    const [state, setState, config] = useContext(FormContext);
+    return [state, setState, config];
 }
 
 /**
@@ -92,7 +93,7 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
     const actionData = useActionData<T>();
     const isLoadedRef = useRef(false);
-    const [$state, setState] = useObserver<T|undefined>(initValue);
+    const [$state, setState] = useObserver<T | undefined>(initValue);
     useEffect(() => {
         if (!isLoadedRef.current) {
             isLoadedRef.current = true;
