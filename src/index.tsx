@@ -64,10 +64,10 @@ const FormContext = createContext<any>([]);
 /**
  * Hooks to get the formState by using the remix action state
  */
-export function useFormState(): [any, React.Dispatch<React.SetStateAction<any>>, {
-    useActionStateListener: UseActionStateListener<any>,
-    useActionStateValue: UseActionStateValue<any>,
-    ActionStateValue: ActionStateValueFC<any>
+export function useRemixActionStateInForm<T>(): [T, React.Dispatch<React.SetStateAction<T>>, {
+    useActionStateListener: UseActionStateListener<T>,
+    useActionStateValue: UseActionStateValue<T>,
+    ActionStateValue: ActionStateValueFC<T>
 }] {
     const [state, setState, config] = useContext(FormContext);
     return [state, setState, config];
@@ -86,6 +86,7 @@ export function useFormState(): [any, React.Dispatch<React.SetStateAction<any>>,
  2. ActionStateValue : This is the React Component, which can be used to render the state value based on the selector function. Means that it requires both a function for selecting state properties and a function for rendering the value. If the value that is picked by the selector changes, then the ActionStateValue component will be rendered. This is helpful for decreasing the amount of renderings that are done more frequently than necessary.
  3. useActionStateValue : This is a React Hook that has a selector function. The difference between this hook and the ActionStateValue component is that this hook returns the value of the state in a direct manner. There are situations when this can result in inefficient re-rendering of the component that uses it.
  4. useActionStateListener : This is a React Hook that consists of two functions: a selector function and a listener function. This is helpful if all you want to do is listen for changes in the action state, but you don't want to have to re-render the react component.
+ 5. Form : This is the React component that can be used as an alternative to remix Form. With this Form element, we do not need to Mount ActionStateField inside Remix Form anymore.
  * </pre>
  */
 export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefined, React.Dispatch<React.SetStateAction<T>>, {
