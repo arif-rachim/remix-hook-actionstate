@@ -32,8 +32,13 @@ export async function actionStateFunction<T>({formData}: { formData: FormData })
     if (typeof dataString !== 'string') {
         throw new Error('Data should be string');
     }
-    const data = JSON.parse(dataString);
-    return data as T;
+    try{
+        const data = JSON.parse(dataString);
+        return data as T;
+    }catch(err){
+        console.error(err);
+    }
+    return undefined;
 }
 
 /**
