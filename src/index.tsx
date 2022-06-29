@@ -54,7 +54,7 @@ export type ActionStateValueFC<T> = React.FC<{ selector: (param?: T) => any, ren
 /**
  * Hook type for getting the action state value
  */
-export type UseActionStateValue<T> = (selector: (param?: T) => any) => void;
+export type UseActionStateValue<T> = (selector: (param?: T) => any) => any;
 
 /**
  * FormContext to get the value of the action state
