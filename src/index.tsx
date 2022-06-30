@@ -32,10 +32,10 @@ export async function actionStateFunction<T>({formData}: { formData: FormData })
     if (typeof dataString !== 'string') {
         throw new Error('Data should be string');
     }
-    try{
+    try {
         const data = JSON.parse(dataString);
         return data as T;
-    }catch(err){
+    } catch (err) {
         console.error(err);
     }
     return undefined;
@@ -98,13 +98,13 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 }] {
 
     const actionData = useActionData<T>();
-    const isLoadedRef = useRef(false);
+    const isMounted = useRef(false);
     const [$state, setState] = useObserver<T | undefined>(initValue);
 
 
     useEffect(() => {
-        if (!isLoadedRef.current) {
-            isLoadedRef.current = true;
+        if (!isMounted.current) {
+            isMounted.current = true;
             return;
         }
         setState(actionData);
@@ -112,12 +112,12 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
     const ActionStateField: React.FC = useMemo(() => {
 
-        const renderObserverValue = debounce(() => {
-            return <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
-        },300);
-
         function ActionStateField() {
-            return <ObserverValue observers={$state} render={renderObserverValue}/>
+            return <ObserverValue observers={$state} render={() => {
+                return <DebounceRender delay={300}>
+                    <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
+                </DebounceRender>
+            }}/>
         }
 
         return ActionStateField;
@@ -175,10 +175,14 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
     }];
 }
 
-function debounce<F extends (...params: any[]) => void>(fn: F, delay: number) {
-    let timeoutID: number = 0;
-    return function(this: any, ...args: any[]) {
-        clearTimeout(timeoutID);
-        timeoutID = window.setTimeout(() => fn.apply(this, args), delay);
-    } as F;
+export function DebounceRender(props: React.PropsWithChildren<{ delay: number }>) {
+    const [children, setChildren] = useState(props.children);
+    const childrenProps = props.children;
+    const delay = props.delay;
+    const timeoutIdRef = useRef(0);
+    useEffect(() => {
+        timeoutIdRef.current = setTimeout(() => setChildren(childrenProps), delay);
+        return () => clearTimeout(timeoutIdRef.current)
+    }, [childrenProps, delay]);
+    return <>{children}</>;
 }
