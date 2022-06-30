@@ -100,6 +100,8 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
     const actionData = useActionData<T>();
     const isLoadedRef = useRef(false);
     const [$state, setState] = useObserver<T | undefined>(initValue);
+
+
     useEffect(() => {
         if (!isLoadedRef.current) {
             isLoadedRef.current = true;
@@ -109,10 +111,13 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
     }, [actionData, setState]);
 
     const ActionStateField: React.FC = useMemo(() => {
+
+        const renderObserverValue = debounce(() => {
+            return <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
+        },300);
+
         function ActionStateField() {
-            return <ObserverValue observers={$state} render={() => {
-                return <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
-            }}/>
+            return <ObserverValue observers={$state} render={renderObserverValue}/>
         }
 
         return ActionStateField;
@@ -168,4 +173,12 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
         ActionStateValue,
         Form
     }];
+}
+
+function debounce<F extends (...params: any[]) => void>(fn: F, delay: number) {
+    let timeoutID: number = 0;
+    return function(this: any, ...args: any[]) {
+        clearTimeout(timeoutID);
+        timeoutID = window.setTimeout(() => fn.apply(this, args), delay);
+    } as F;
 }
