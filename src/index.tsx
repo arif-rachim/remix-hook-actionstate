@@ -114,9 +114,10 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
         function ActionStateField() {
             return <ObserverValue observers={$state} render={() => {
-                return <DebounceRender delay={300}>
-                    <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
-                </DebounceRender>
+                // return <DebounceRender delay={300}>
+                //     <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
+                // </DebounceRender>
+                return <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
             }}/>
         }
 
