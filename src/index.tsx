@@ -1,6 +1,8 @@
-import React, {createContext, useContext, useEffect, useMemo, useRef, useState} from "react";
+import React, {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
+import type {Observer} from "react-hook-useobserver";
 import {ObserverValue, useObserver} from "react-hook-useobserver";
-import {Form as RemixForm, FormProps, useActionData} from "@remix-run/react";
+import type {FormProps, SubmitFunction} from "@remix-run/react";
+import {Form as RemixForm, useActionData, useSubmit} from "@remix-run/react";
 
 /**
  * we can use actionStateFunction in remix actionFunction to obtain the action state.
@@ -19,7 +21,7 @@ import {Form as RemixForm, FormProps, useActionData} from "@remix-run/react";
     const action = formData.get('action');
     const actionState = await actionStateFunction<StateData>({formData});
     if(action === 'save'){
-        // this is where we can do saving or etc
+        // this is where we can do saving or etc.
     }
     return json(actionState);
 }
@@ -42,33 +44,38 @@ export async function actionStateFunction<T>({formData}: { formData: FormData })
 }
 
 /**
- * Hook type for listening the actionState
+ * Hook types for listening the actionState
  */
 export type UseActionStateListener<T> = (selector: (param?: (T)) => any, listener: (newVal: any, oldVal: any) => void) => void
+
+type RenderFC = (value: any) => React.ReactElement;
 
 /**
  * Component type for getting the action state value
  */
-export type ActionStateValueFC<T> = React.FC<{ selector: (param?: T) => any, render: (value: any) => React.ReactElement }>
+export type ActionStateValueFC<T> = React.FC<{ selector: (param?: T) => any, render: RenderFC }>
+
 
 /**
- * Hook type for getting the action state value
+ * Hook types for getting the action state value
  */
 export type UseActionStateValue<T> = (selector: (param?: T) => any) => any;
 
 /**
  * FormContext to get the value of the action state
  */
-const FormContext = createContext<any>([]);
+const FormContext = createContext<RemixActionStateInFormHookType<any>>([] as any);
 
+type RemixActionStateInFormHookType<T> = [Observer<T | undefined>, React.Dispatch<React.SetStateAction<T>>, {
+    useActionStateListener: UseActionStateListener<T>,
+    useActionStateValue: UseActionStateValue<T>,
+    ActionStateValue: ActionStateValueFC<T>,
+    submit:SubmitFunction
+}];
 /**
  * Hooks to get the formState by using the remix action state
  */
-export function useRemixActionStateInForm<T>(): [T, React.Dispatch<React.SetStateAction<T>>, {
-    useActionStateListener: UseActionStateListener<T>,
-    useActionStateValue: UseActionStateValue<T>,
-    ActionStateValue: ActionStateValueFC<T>
-}] {
+export function useRemixActionStateInForm<T>():RemixActionStateInFormHookType<T>  {
     const [state, setState, config] = useContext(FormContext);
     return [state, setState, config];
 }
@@ -85,22 +92,30 @@ export function useRemixActionStateInForm<T>(): [T, React.Dispatch<React.SetStat
  1. ActionStateField : This is the React Component that needs to be mounted in the Form. This ActionStateField Component will render the html input element with the type hidden.
  2. ActionStateValue : This is the React Component, which can be used to render the state value based on the selector function. Means that it requires both a function for selecting state properties and a function for rendering the value. If the value that is picked by the selector changes, then the ActionStateValue component will be rendered. This is helpful for decreasing the amount of renderings that are done more frequently than necessary.
  3. useActionStateValue : This is a React Hook that has a selector function. The difference between this hook and the ActionStateValue component is that this hook returns the value of the state in a direct manner. There are situations when this can result in inefficient re-rendering of the component that uses it.
- 4. useActionStateListener : This is a React Hook that consists of two functions: a selector function and a listener function. This is helpful if all you want to do is listen for changes in the action state, but you don't want to have to re-render the react component.
+ 4. useActionStateListener : This is a React Hook that consists of two functions: a selector function and a listener function. This is helpful if all you want to do is listen for changes in the action state, but you don't want to have to re-render the React component.
  5. Form : This is the React component that can be used as an alternative to remix Form. With this Form element, we do not need to Mount ActionStateField inside Remix Form anymore.
  * </pre>
  */
-export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefined, React.Dispatch<React.SetStateAction<T>>, {
+export function useRemixActionState<T extends object>(initValue?: (T | (() => T))): [Observer<T | undefined>, React.Dispatch<React.SetStateAction<T>>, {
     ActionStateField: React.FC,
     useActionStateListener: UseActionStateListener<T | undefined>,
     useActionStateValue: UseActionStateValue<T>,
     ActionStateValue: ActionStateValueFC<T>,
-    Form: React.FC<FormProps & React.RefAttributes<HTMLFormElement>>
+    Form: React.FC<FormProps & React.RefAttributes<HTMLFormElement>>,
+    submit : SubmitFunction
 }] {
 
     const actionData = useActionData<T>();
     const isMounted = useRef(false);
     const [$state, setState] = useObserver<T | undefined>(initValue);
+    const remixSubmit = useSubmit();
+    const hiddenActionStateRef = useRef<HTMLInputElement | null>(null);
 
+    const submit:SubmitFunction = useCallback((props,options) => {
+        const value = JSON.stringify($state.current);
+        hiddenActionStateRef.current?.setAttribute('value', value);
+        remixSubmit(props,options)
+    },[$state, remixSubmit]);
 
     useEffect(() => {
         if (!isMounted.current) {
@@ -114,17 +129,12 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
         function ActionStateField() {
             return <ObserverValue observers={$state} render={() => {
-                // return <DebounceRender delay={300}>
-                //     <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
-                // </DebounceRender>
                 return <input type={'hidden'} name={'_actionState'} defaultValue={JSON.stringify($state.current)}/>
             }}/>
         }
 
         return ActionStateField;
     }, [$state]);
-
-    const state = $state.current;
 
     const hooks = useMemo(() => {
         function useActionStateListener<T>(selector: (param?: (T)) => any, listener: (newVal: any, oldVal: any) => void) {
@@ -144,46 +154,63 @@ export function useRemixActionState<T>(initValue?: (T | (() => T))): [T | undefi
 
         function useActionStateValue<T>(selector: (param: T | undefined) => any) {
             const [value, setValue] = useState(() => selector($state.current as any));
-            useActionStateListener(selector, setValue);
+            useActionStateListener(selector, function setValueWrapper(userSuppliedValue:any){
+                setValue((oldVal:any) => {
+                    let newVal = userSuppliedValue;
+                    if(isFunction(newVal)){
+                        newVal = newVal.call(null,oldVal);
+                    }
+                    if(newVal !== oldVal && Array.isArray(newVal) && Array.isArray(oldVal) && newVal.length === oldVal.length){
+                        for (let i = 0; i < oldVal.length; i++) {
+                            if(oldVal[i] !== newVal[i]){
+                                return newVal;
+                            }
+                        }
+                        return oldVal;
+                    }
+                    return newVal;
+                })
+            } );
             return value;
         }
 
-        function ActionStateValue<T>(props: React.PropsWithChildren<{ selector: (param: T | undefined) => any, render: (value: any) => React.ReactElement }>) {
+        function ActionStateValue<T>(props: React.PropsWithChildren<{ selector: (param: T | undefined) => any, render: RenderFC }>) {
             const value = useActionStateValue(props.selector);
             return props.render(value);
         }
 
         function Form(props: FormProps & React.RefAttributes<HTMLFormElement>) {
-            return <RemixForm {...props}>
+
+            const onSubmit = props.onSubmit;
+            const onSubmitCallback = useCallback((event) => {
+                if (onSubmit) onSubmit(event);
+                const value = JSON.stringify($state.current);
+                hiddenActionStateRef.current?.setAttribute('value', value);
+            }, [onSubmit]);
+            return <RemixForm {...props} onSubmit={onSubmitCallback}>
                 <FormContext.Provider
-                    value={[state, setState, {useActionStateListener, useActionStateValue, ActionStateValue}]}>
-                    <ActionStateField/>
+                    value={[$state, setState, {useActionStateListener, useActionStateValue, ActionStateValue,submit}]}>
+                    <input ref={(dom) => hiddenActionStateRef.current = dom} type={'hidden'} name={'_actionState'}/>
                     {props.children}
                 </FormContext.Provider>
             </RemixForm>
         }
 
         return {useActionStateListener, useActionStateValue, ActionStateValue, Form}
-    }, [$state]);
+    }, [$state, setState]);
 
     const {ActionStateValue, useActionStateValue, useActionStateListener, Form} = hooks;
-    return [state, setState as React.Dispatch<React.SetStateAction<T>>, {
+
+    return [$state, setState as React.Dispatch<React.SetStateAction<T>>, {
         ActionStateField,
         useActionStateListener,
         useActionStateValue,
         ActionStateValue,
-        Form
+        Form,
+        submit
     }];
 }
 
-export function DebounceRender(props: React.PropsWithChildren<{ delay: number }>) {
-    const [children, setChildren] = useState(props.children);
-    const childrenProps = props.children;
-    const delay = props.delay;
-    const timeoutIdRef = useRef(0);
-    useEffect(() => {
-        timeoutIdRef.current = setTimeout(() => setChildren(childrenProps), delay);
-        return () => clearTimeout(timeoutIdRef.current)
-    }, [childrenProps, delay]);
-    return <>{children}</>;
+function isFunction(functionToCheck:any) {
+    return functionToCheck && {}.toString.call(functionToCheck) === '[object Function]';
 }

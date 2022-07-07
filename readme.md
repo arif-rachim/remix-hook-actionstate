@@ -1,3 +1,3 @@
 # Remix Hook useActionState.
 
-Remix hook to bind the state between Component and Action.
+Make it simple for your remix application to transfer state between action functions and route components.
